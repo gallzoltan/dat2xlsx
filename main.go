@@ -28,6 +28,21 @@ type telrow struct {
 	dt       string
 }
 
+func excelTime(t string) float32 {
+	var result float32
+	var validStr = regexp.MustCompile(`^\d{2}:\d{2}:\d{2}$`)
+	if validStr.MatchString(t) {
+		split := strings.Split(t, ":")
+		hh, _ := strconv.Atoi(split[0])
+		mm, _ := strconv.Atoi(split[1])
+		ss, _ := strconv.Atoi(split[2])
+		result = (0.041666 * float32(hh)) + (0.000694 * float32(mm)) + (0.00001157 * float32(ss))
+	} else {
+		result = 0.0
+	}
+	return result
+}
+
 func readTelDat(path string, fromdt string) ([]telrow, error) {
 	var lines []telrow
 	var validLine = regexp.MustCompile(`^\d{2}\/\d{2}\/\d{2}`)
@@ -52,18 +67,20 @@ func readTelDat(path string, fromdt string) ([]telrow, error) {
 			if u >= from {
 				//ext, err := strconv.Parseint(line[15:23], 6, 64)
 				rowdate := "20" + strings.Replace(line[:8], "/", ".", 2)
+				rowring := strings.Replace(line[79:83], "'", ":", 1)
+				rowdura := strings.Replace(line[84:95], "'", ":", 1)
 				row := telrow{
-					date:     rowdate,
-					time:     line[9:14],
-					ext:      line[15:22],
-					co:       line[23:27],
-					number:   line[28:77],
-					ring:     line[79:83],
-					duration: line[84:95],
-					cost:     line[96:104],
-					acc:      line[105:115],
-					cd:       line[116:119],
-					dt:       line[120:131],
+					date:     strings.TrimSpace(rowdate),
+					time:     strings.TrimSpace(line[9:14]),
+					ext:      strings.TrimSpace(line[15:22]),
+					co:       strings.TrimSpace(line[23:27]),
+					number:   strings.TrimSpace(line[28:77]),
+					ring:     rowring,
+					duration: strings.TrimSpace(rowdura),
+					cost:     strings.TrimSpace(line[96:104]),
+					acc:      strings.TrimSpace(line[105:115]),
+					cd:       strings.TrimSpace(line[116:119]),
+					dt:       strings.TrimSpace(line[120:131]),
 				}
 
 				lines = append(lines, row)
@@ -77,6 +94,19 @@ func readTelDat(path string, fromdt string) ([]telrow, error) {
 func writeExcel(lines []telrow, xlsxFile string) {
 	xlsx := excelize.NewFile()
 	xlsx.SetSheetName(xlsx.GetSheetName(0), "teledat")
+	hmm, err := xlsx.NewStyle(`{"number_format": 20}`)
+	if err != nil {
+		fmt.Println(err)
+	}
+	mmss, err := xlsx.NewStyle(`{"number_format": 45}`)
+	if err != nil {
+		fmt.Println(err)
+	}
+	hmmss, err := xlsx.NewStyle(`{"number_format": 46}`)
+	if err != nil {
+		fmt.Println(err)
+	}
+
 	xlsx.SetCellStr("teledat", "A1", "Date")
 	xlsx.SetCellStr("teledat", "B1", "Time")
 	xlsx.SetCellStr("teledat", "C1", "Ext")
@@ -91,9 +121,11 @@ func writeExcel(lines []telrow, xlsxFile string) {
 	for i, line := range lines {
 		n := i + 2
 		axis, _ := excelize.CoordinatesToCellName(1, n)
-		xlsx.SetCellStr("teledat", axis, line.date)
+		xlsx.SetCellValue("teledat", axis, line.date)
 		axis, _ = excelize.CoordinatesToCellName(2, n)
-		xlsx.SetCellStr("teledat", axis, line.time)
+		xlsx.SetCellValue("teledat", axis, line.time)
+		xlsx.SetCellStyle("teledat", axis, axis, hmm)
+
 		axis, _ = excelize.CoordinatesToCellName(3, n)
 		xlsx.SetCellStr("teledat", axis, line.ext)
 		axis, _ = excelize.CoordinatesToCellName(4, n)
@@ -101,9 +133,14 @@ func writeExcel(lines []telrow, xlsxFile string) {
 		axis, _ = excelize.CoordinatesToCellName(5, n)
 		xlsx.SetCellStr("teledat", axis, line.number)
 		axis, _ = excelize.CoordinatesToCellName(6, n)
-		xlsx.SetCellStr("teledat", axis, line.ring)
+		xlsx.SetCellValue("teledat", axis, line.ring)
+		xlsx.SetCellStyle("teledat", axis, axis, mmss)
+
 		axis, _ = excelize.CoordinatesToCellName(7, n)
-		xlsx.SetCellStr("teledat", axis, line.duration)
+		//xlsx.SetCellValue("teledat", axis, line.duration)
+		xlsx.SetCellValue("teledat", axis, excelTime(line.duration))
+		xlsx.SetCellStyle("teledat", axis, axis, hmmss)
+
 		axis, _ = excelize.CoordinatesToCellName(8, n)
 		xlsx.SetCellStr("teledat", axis, line.cost)
 		axis, _ = excelize.CoordinatesToCellName(9, n)
@@ -120,7 +157,7 @@ func writeExcel(lines []telrow, xlsxFile string) {
 }
 
 func main() {
-	log.Println("The program has started.")
+	log.Println("The program has started...")
 	now := time.Now()
 	beginDate := now.AddDate(0, -1, 0)
 	fromPtr := flag.String("begin", beginDate.Format("060102"), "a megadott yymmdd dátumtól kezdje el az exportálást")
