@@ -65,7 +65,6 @@ func readTelDat(path string, fromdt string) ([]telrow, error) {
 			}
 
 			if u >= from {
-				//ext, err := strconv.Parseint(line[15:23], 6, 64)
 				rowdate := "20" + strings.Replace(line[:8], "/", ".", 2)
 				rowring := strings.Replace(line[79:83], "'", ":", 1)
 				rowdura := strings.Replace(line[84:95], "'", ":", 1)
@@ -75,7 +74,7 @@ func readTelDat(path string, fromdt string) ([]telrow, error) {
 					ext:      strings.TrimSpace(line[15:22]),
 					co:       strings.TrimSpace(line[23:27]),
 					number:   strings.TrimSpace(line[28:77]),
-					ring:     rowring,
+					ring:     strings.TrimSpace(rowring),
 					duration: strings.TrimSpace(rowdura),
 					cost:     strings.TrimSpace(line[96:104]),
 					acc:      strings.TrimSpace(line[105:115]),
